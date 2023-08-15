@@ -152,11 +152,19 @@ export default function Home() {
               </button>
             </form>
 
-            {tasksLoading && <div>Loading...</div>}
+            {tasksLoading && (
+              <div className="flex">
+                <div className="px-3 py-2 text-gray-500">Loading...</div>
+              </div>
+            )}
 
-            {tasks?.map((task) => (
-              <TaskComponent task={task} key={task.id} />
-            ))}
+            {tasks?.length ? (
+              tasks.map((task) => <TaskComponent task={task} key={task.id} />)
+            ) : (
+              <div className="flex">
+                <div className="px-3 py-2 text-gray-500">No tasks found</div>
+              </div>
+            )}
           </div>
         )}
       </main>
