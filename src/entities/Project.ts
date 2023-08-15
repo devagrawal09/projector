@@ -1,9 +1,9 @@
-import { Allow, Entity, Fields, IdEntity, Validators } from "remult";
+import { Allow, Entity, Fields, Validators } from "remult";
 
 @Entity<Project>("projects", {
-  allowApiCrud: Allow.authenticated,
+  allowApiCrud: true,
 })
-export class Project extends IdEntity {
+export class Project {
   @Fields.uuid()
   id = "";
 

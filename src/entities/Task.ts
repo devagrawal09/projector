@@ -1,16 +1,9 @@
-import {
-  Allow,
-  BackendMethod,
-  Entity,
-  Fields,
-  IdEntity,
-  Validators,
-} from "remult";
+import { Allow, Entity, Fields, Validators } from "remult";
 
 @Entity<Task>("tasks", {
-  allowApiCrud: Allow.authenticated,
+  allowApiCrud: true,
 })
-export class Task extends IdEntity {
+export class Task {
   @Fields.uuid()
   id = "";
 
@@ -24,9 +17,7 @@ export class Task extends IdEntity {
   })
   completed = false;
 
-  @Fields.string({
-    validate: Validators.required,
-  })
+  @Fields.string()
   userId = "";
 
   @Fields.string()
@@ -34,16 +25,4 @@ export class Task extends IdEntity {
 
   @Fields.date({ defaultValue: () => new Date() })
   createdAt?: Date;
-
-  @BackendMethod({
-    allowed: (task, remult) => {
-      console.log(`Updating task ${task?.id} by ${remult?.user?.id}`);
-      return remult?.user?.id === task?.userId;
-      // return false
-    },
-  })
-  async toggleCompleted(completed: boolean) {
-    this.completed = completed;
-    await this.save();
-  }
 }
