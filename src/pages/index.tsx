@@ -1,118 +1,201 @@
-import Image from 'next/image'
-import { Inter } from 'next/font/google'
+import { Task } from "@/entities/Task";
+import { useUser, useOrganization, useClerk } from "@clerk/nextjs";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+import clsx from "clsx";
+import { useState, useEffect, FormEvent } from "react";
+import { remult } from "remult";
+import { Layout } from "@/components/layout";
+import { Project } from "@/entities/Project";
 
-const inter = Inter({ subsets: ['latin'] })
+const todosRepo = remult.repo(Task);
+const projectsRepo = remult.repo(Project);
 
 export default function Home() {
+  const [newTaskTitle, setNewTaskTitle] = useState("");
+  const [_selectedProject, setSelected] = useLocalStorage("selectedProject");
+
+  const qc = useQueryClient();
+  const { user } = useUser();
+  const { organization } = useOrganization();
+
+  const selectedProject = organization ? _selectedProject : undefined;
+
+  const { data: projects } = useQuery(["projects", organization?.id], () =>
+    organization
+      ? projectsRepo.find({
+          where: { orgId: organization?.id },
+        })
+      : []
+  );
+
+  const { data: tasks, isLoading } = useQuery(["tasks", selectedProject], () =>
+    todosRepo.find({
+      where: { projectId: selectedProject },
+    })
+  );
+
+  useEffect(() => {
+    if (!selectedProject) {
+      setSelected(projects?.[0]?.id || "");
+    }
+  }, [projects, selectedProject, setSelected]);
+
+  async function addTask(e: FormEvent) {
+    e.preventDefault();
+    try {
+      await todosRepo.insert({
+        title: newTaskTitle,
+        completed: false,
+        createdAt: new Date(),
+        userId: user?.id,
+        projectId: selectedProject,
+      });
+      qc.invalidateQueries(["tasks"]);
+      setNewTaskTitle("");
+    } catch (error: any) {
+      alert(error.message);
+    }
+  }
+
+  async function addProject() {
+    try {
+      if (!organization) throw new Error("No organization found");
+
+      const projectsLength = projects?.length || 0;
+
+      await projectsRepo.insert({
+        title: `Project ${projectsLength + 1}`,
+        orgId: organization.id,
+      });
+
+      qc.invalidateQueries(["projects"]);
+    } catch (error: any) {
+      alert(error.message);
+    }
+  }
+
   return (
-    <main
-      className={`flex min-h-screen flex-col items-center justify-between p-24 ${inter.className}`}
-    >
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">src/pages/index.tsx</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <Layout>
+      <main>
+        <h1 className="text-[#ef4444] italic text-6xl text-center">todos</h1>
+
+        <div className=" w-1/2 min-w-[400px] bg-white border border-solid border-gray-300 rounded-lg m-auto card-shadow ">
+          <div className="flex">
+            {organization && (
+              <>
+                {projects?.length ? (
+                  projects.map((project) => (
+                    <button
+                      key={project.id}
+                      onClick={() => setSelected(project.id)}
+                      className={clsx(
+                        "px-3 py-2 border-x bg-gray-100 text-gray-700",
+                        selectedProject === project.id &&
+                          "bg-white text-black text-xl"
+                      )}
+                    >
+                      {project.title}
+                    </button>
+                  ))
+                ) : (
+                  <div className="px-3 py-2 text-gray-500">
+                    No projects found
+                  </div>
+                )}
+                <span className="grow"></span>
+                <button className="px-3 py-2 border-x" onClick={addProject}>
+                  Add Project
+                </button>
+              </>
+            )}
+          </div>
+          <form
+            onSubmit={addTask}
+            className="border border-b border-solid flex px-2 py-1 items-center todo"
           >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
+            <input
+              value={newTaskTitle}
+              placeholder="What needs to be done?"
+              onChange={(e) => setNewTaskTitle(e.target.value)}
+              className="w-full p-1 outline-none placeholder:italic"
             />
-          </a>
+            <button className="font-medium rounded-full border px-4 py-2 text-md font-sans bg-white border-none text-white hover:text-inherit hover:bg-gray-200">
+              Add
+            </button>
+          </form>
+
+          {isLoading && <div>Loading...</div>}
+
+          {tasks?.map((task) => (
+            <TaskComponent task={task} key={task.id} />
+          ))}
         </div>
-      </div>
+      </main>
+    </Layout>
+  );
+}
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700/10 after:dark:from-sky-900 after:dark:via-[#0141ff]/40 before:lg:h-[360px]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
+function TaskComponent({ task }: { task: Task }) {
+  const { membershipList } = useOrganization({ membershipList: {} });
 
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
+  const qc = useQueryClient();
 
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
+  const member = membershipList?.find(
+    (m) => m.publicUserData.userId === task.userId
+  );
 
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Discover and deploy boilerplate example Next.js&nbsp;projects.
-          </p>
-        </a>
+  async function setCompleted(task: Task, completed: boolean) {
+    try {
+      await task.toggleCompleted(completed);
 
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=default-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
+      qc.invalidateQueries(["tasks"]);
+    } catch (error: any) {
+      alert(error.message);
+    }
+  }
+
+  async function deleteTask(task: Task) {
+    try {
+      await todosRepo.delete(task.id);
+      qc.invalidateQueries(["tasks"]);
+    } catch (error: any) {
+      alert(error.message);
+    }
+  }
+
+  return (
+    <div className="border-b flex px-2 py-1 gap-4 items-center todo">
+      <input
+        type="checkbox"
+        checked={task.completed}
+        onChange={(e) => setCompleted(task, e.target.checked)}
+        className="w-5 h-5"
+      />
+      <span className={clsx("p-1 grow", task.completed && "line-through")}>
+        {task.title}{" "}
+        {member &&
+          `(${member.publicUserData.firstName} ${member.publicUserData.lastName})`}
+      </span>
+      <button
+        onClick={() => deleteTask(task)}
+        className="font-medium rounded-full border px-4 py-2 text-md font-sans bg-white border-none text-white hover:text-inherit hover:bg-gray-200"
+      >
+        x
+      </button>
+    </div>
+  );
+}
+
+function useLocalStorage(key: string, init?: string) {
+  const [value, setValue] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return localStorage.getItem(key) || init || "";
+  });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem(key, value);
+  }, [key, value]);
+
+  return [value, setValue] as const;
 }
