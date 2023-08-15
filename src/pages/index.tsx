@@ -20,7 +20,7 @@ export default function Home() {
   const [_selectedProject, setSelected] = useLocalStorage("selectedProject");
 
   const qc = useQueryClient();
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded: userLoaded } = useUser();
   const { organization } = useOrganization();
 
   const selectedProject = organization ? _selectedProject : undefined;
@@ -33,10 +33,12 @@ export default function Home() {
       : []
   );
 
-  const { data: tasks, isLoading } = useQuery(["tasks", selectedProject], () =>
-    todosRepo.find({
-      where: { projectId: selectedProject },
-    })
+  const { data: tasks, isLoading: tasksLoading } = useQuery(
+    ["tasks", selectedProject],
+    () =>
+      todosRepo.find({
+        where: { projectId: selectedProject },
+      })
   );
 
   useEffect(() => {
@@ -84,14 +86,14 @@ export default function Home() {
       <main>
         <h1 className="text-[#ef4444] italic text-6xl text-center">todos</h1>
 
-        {!isLoaded && (
+        {!userLoaded && (
           <div className=" w-1/2 min-w-[400px] bg-white border border-solid border-gray-300 rounded-lg m-auto card-shadow ">
             <div className="flex">
               <div className="px-3 py-2 text-gray-500">Loading...</div>
             </div>
           </div>
         )}
-        {isLoaded && !user && (
+        {userLoaded && !user && (
           <div className=" w-1/2 min-w-[400px] bg-white border border-solid border-gray-300 rounded-lg m-auto card-shadow ">
             <div className="flex">
               <div className="px-3 py-2 text-gray-500">
@@ -104,7 +106,7 @@ export default function Home() {
             </div>
           </div>
         )}
-        {isLoaded && user && (
+        {userLoaded && user && (
           <div className=" w-1/2 min-w-[400px] bg-white border border-solid border-gray-300 rounded-lg m-auto card-shadow ">
             <div className="flex">
               {organization && (
@@ -150,7 +152,7 @@ export default function Home() {
               </button>
             </form>
 
-            {isLoading && <div>Loading...</div>}
+            {tasksLoading && <div>Loading...</div>}
 
             {tasks?.map((task) => (
               <TaskComponent task={task} key={task.id} />
