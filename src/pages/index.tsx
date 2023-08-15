@@ -140,7 +140,7 @@ function TasksComponent({
   userId,
   selectedProject,
 }: {
-  selectedProject: string | undefined;
+  selectedProject?: string;
   userId?: string;
 }) {
   const [newTaskTitle, setNewTaskTitle] = useState("");
