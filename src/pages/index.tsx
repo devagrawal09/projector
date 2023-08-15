@@ -24,19 +24,19 @@ export default function Home() {
 
 function TasksComponent({
   userId,
-  selectedProject,
+  projectId,
 }: {
-  selectedProject?: string;
+  projectId?: string;
   userId?: string;
 }) {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const qc = useQueryClient();
 
   const { data: tasks, isLoading: tasksLoading } = useQuery(
-    ["tasks", selectedProject],
+    ["tasks", projectId],
     () =>
       todosRepo.find({
-        where: { projectId: selectedProject, userId },
+        where: { projectId, userId },
       })
   );
 
@@ -48,7 +48,7 @@ function TasksComponent({
         completed: false,
         createdAt: new Date(),
         userId,
-        projectId: selectedProject,
+        projectId,
       });
       qc.invalidateQueries(["tasks"]);
       setNewTaskTitle("");
